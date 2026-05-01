@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: kuma
+      POSTGRES_PASSWORD: kuma_password
+      POSTGRES_DB: kuma_db
+    volumes:
+      - kuma_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kuma -d kuma_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - kuma_redisdata:/data
+    command: redis-server --appendonly yes
+
+volumes:
+  kuma_pgdata:
+  kuma_redisdata:

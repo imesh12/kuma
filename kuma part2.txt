@@ -1,0 +1,497 @@
+You are building Kuma Safety Zone / くまセーフティゾーン.
+
+Do NOT clone kumamap.
+Use it only as market reference.
+Create a cleaner, more trustworthy, Japan-ready bear safety platform.
+
+Stack:
+- Next.js 16 App Router
+- TypeScript
+- Prisma + PostgreSQL
+- Mapbox / react-map-gl
+- Tailwind CSS
+- Admin dashboard + Public map + LINE alert system
+
+TODAY TARGET:
+1. Clean backend foundation
+2. Best admin dashboard detail UX
+3. Best public map UX
+4. Prepare clean structure for LINE setup tomorrow
+
+==================================================
+PRODUCT DIRECTION
+==================================================
+
+Kuma Safety Zone is not just a bear map.
+
+It is:
+- Bear incident reporting system
+- Admin verification dashboard
+- Public safety map
+- Radius-based alert system
+- LINE notification platform
+- Trust-based report system
+
+Main advantage:
+- Exact location is private/admin only
+- Public location is blurred
+- Alerts use radius from exact location
+- Reports have trust/verification status
+
+==================================================
+TODAY BUILD GOALS
+==================================================
+
+A. BACKEND CLEANUP
+
+Review and improve:
+- Prisma schema
+- Report model
+- Alert API
+- Public reports API
+- Admin reports API
+- Data validation
+- Error handling
+- Japanese-friendly response labels
+
+Make sure reports support:
+
+Report:
+- id
+- title
+- description
+- prefecture
+- municipality
+- address
+- realLat
+- realLng
+- publicLat
+- publicLng
+- status
+- sourceType
+- trustLevel
+- severity
+- sightedAt
+- imageUrl
+- createdAt
+- updatedAt
+
+Alert:
+- id
+- reportId
+- radiusMeters
+- message
+- sentAt
+- targetCount
+- successCount
+- failedCount
+
+Important:
+- Public API must NEVER expose realLat / realLng.
+- Admin API may expose realLat / realLng.
+- Public map uses publicLat / publicLng.
+- Alert sending uses realLat / realLng.
+
+Create or improve these APIs:
+
+GET /api/public/reports
+- returns public-safe reports only
+- includes publicLat/publicLng
+- excludes realLat/realLng
+
+GET /api/admin/reports
+- admin only
+- includes exact location
+
+GET /api/admin/reports/[id]
+- admin only
+- includes exact + public location
+
+POST /api/admin/reports/[id]/send-alert
+- admin only
+- accepts radiusMeters
+- uses realLat/realLng
+- logs alert result
+
+==================================================
+B. ADMIN REPORT DETAIL DASHBOARD
+==================================================
+
+Upgrade admin report detail page.
+
+Page goal:
+Admin can review one report, understand risk, compare exact/public location, choose alert radius, and send LINE alert.
+
+Admin detail layout:
+
+Top:
+- Back button
+- Report title
+- Status badge
+- Trust badge
+- Severity badge
+
+Main grid:
+LEFT:
+- Report detail card
+- Description
+- Address
+- Prefecture / municipality
+- Sighted time
+- Source type
+- Trust level
+- Status
+- Image if available
+
+RIGHT:
+- Admin map card
+
+Admin map requirements:
+- Use react-map-gl
+- Red marker = exact location realLat/realLng
+- Blue marker = public blurred location publicLat/publicLng
+- Radius circle centered on realLat/realLng
+- Radius selector:
+  - 100m
+  - 300m
+  - 500m
+  - 1km
+  - 2km
+  - 3km
+  - 5km
+- Dynamic update when radius changes
+- Use Source + Layer for radius circle
+- Fill color red with low opacity
+- Outline red
+
+Below map:
+- Alert preview card
+- Shows selected radius in Japanese
+- Shows estimated target area text
+- Send alert button
+- Confirmation modal before sending
+
+Japanese labels:
+- 通知範囲
+- 正確な位置
+- 公開位置
+- 半径
+- LINE通知を送信
+- 通知プレビュー
+- この範囲内の登録者に通知されます
+
+UX style:
+- Clean Japanese gov/safety style
+- White cards
+- Soft shadows
+- Red for danger
+- Blue for public/blurred location
+- Green for verified
+- Amber for pending/review
+
+==================================================
+C. PUBLIC MAP PAGE
+==================================================
+
+Create best public map page, not clone.
+
+Route:
+- /map
+
+Layout:
+- Fullscreen map experience
+- Header navigation
+- Search bar overlay
+- Right-side latest report feed on desktop
+- Bottom sheet feed on mobile
+
+Header:
+- Logo: くまセーフティゾーン
+- Nav:
+  - マップ
+  - 最新情報
+  - 安全ガイド
+  - 通知
+- Red report button:
+  - 目撃情報を報告
+
+Map:
+- Uses publicLat/publicLng only
+- NEVER use realLat/realLng
+- Shows public bear report markers
+- Heatmap layer for recent activity
+- Marker click opens report popup
+- Feed click flies to marker
+- Selected report highlighted
+
+Map layers:
+1. Heatmap layer
+2. Public report points
+3. Selected marker
+
+Report popup:
+- Status/source badge
+- Title
+- Description preview
+- Location text
+- Sighted time
+- Severity
+- Button: 詳細を見る
+
+Right feed:
+- Title: 最新の目撃情報
+- Count for last 30 days
+- Last updated text
+- Report list cards
+- Each card:
+  - title
+  - location
+  - time
+  - source badge
+  - severity badge
+  - small thumbnail if image exists
+
+Search:
+- Placeholder:
+  - 地域・市区町村を検索
+- Search filters reports by text
+- Optional flyTo if coordinates known later
+
+Mobile:
+- Header compact
+- Map full screen
+- Feed as bottom sheet
+- Report button floating
+
+UX style:
+- Safety-first
+- Calm but alert
+- Premium public service feel
+- Japanese labels
+- Smooth map interactions
+- No clutter
+
+==================================================
+D. DASHBOARD HOME
+==================================================
+
+Improve admin dashboard homepage.
+
+Cards:
+- 今日の報告数
+- 審査待ち
+- 高リスク
+- 送信済み通知
+- 最新報告
+- 地域別リスク
+
+Add quick actions:
+- 新規報告を登録
+- 公開マップを見る
+- LINE通知設定
+- レポート一覧
+
+Use clean responsive grid.
+
+==================================================
+E. COMPONENT STRUCTURE
+==================================================
+
+Create reusable components:
+
+components/map/
+- PublicBearMap.tsx
+- AdminReportMap.tsx
+- RadiusCircleLayer.tsx
+- ReportMarker.tsx
+- ReportPopup.tsx
+- HeatmapLayer.tsx
+
+components/reports/
+- ReportFeed.tsx
+- ReportFeedCard.tsx
+- ReportStatusBadge.tsx
+- SeverityBadge.tsx
+- TrustBadge.tsx
+- ReportDetailCard.tsx
+
+components/admin/
+- AdminStatsCard.tsx
+- AlertPreviewCard.tsx
+- SendAlertConfirmDialog.tsx
+
+lib/map/
+- create-radius-circle.ts
+- reports-to-geojson.ts
+- map-style.ts
+
+lib/api/
+- public-report-safe.ts
+- admin-report-transform.ts
+
+==================================================
+F. QUALITY RULES
+==================================================
+
+- TypeScript strict
+- No any unless unavoidable
+- Do not expose private coordinates in public API
+- Keep server/client component boundaries clean
+- Use loading states
+- Use empty states
+- Use error states
+- Responsive design
+- Japanese UI text
+- Clean file structure
+- Do not break existing CRUD
+- Do not break existing Send Alert API
+
+==================================================
+G. FINAL RESULT EXPECTED
+==================================================
+
+By end of today:
+
+1. Admin report detail page feels production-ready.
+2. Admin can see exact marker, public marker, and alert radius.
+3. Public map looks like a real safety product.
+4. Backend clearly separates public/admin report data.
+5. LINE integration is structurally ready for tomorrow.
+6. Admin can contact reporter privately through a safe, logged message system.
+7. Reporter privacy is protected while police/city office can verify details.
+
+==================================================
+H. REPORTER CONTACT + PRIVATE MESSAGE SYSTEM
+==================================================
+
+Add reporter contact system for follow-up verification.
+
+Goal:
+Police, city office, or admin can ask the reporter for more details without exposing reporter private information unnecessarily.
+
+Privacy-first rule:
+- Public API must NEVER expose reporter info.
+- Normal admin should see reporter contact status, not full private data.
+- Show masked LINE user ID only:
+  example: U8f3a...92d1
+- Only SUPER_ADMIN can reveal full LINE user ID if required.
+- All contact actions must be logged.
+
+Reporter fields:
+
+Reporter:
+- id
+- displayName
+- lineUserId
+- maskedLineUserId
+- contactConsent
+- contactStatus
+- createdAt
+- updatedAt
+
+Report:
+- reporterId
+- reporter
+- reporterContactAllowed
+- followUpStatus
+
+Enums:
+ReporterContactStatus:
+- CONTACTABLE
+- NO_CONSENT
+- BLOCKED
+- UNKNOWN
+
+FollowUpStatus:
+- NOT_NEEDED
+- NEEDS_CONTACT
+- MESSAGE_SENT
+- REPLIED
+- RESOLVED
+
+PrivateMessage:
+- id
+- reportId
+- reporterId
+- senderAdminId
+- senderRole
+- channel
+- message
+- status
+- sentAt
+- deliveredAt
+- readAt
+- repliedAt
+- createdAt
+
+PrivateMessageChannel:
+- LINE
+
+PrivateMessageStatus:
+- DRAFT
+- SENT
+- DELIVERED
+- FAILED
+- REPLIED
+
+Admin report detail page must include:
+
+Reporter card:
+- 通報者情報
+- 表示名
+- 連絡可否
+- LINE連携状態
+- Masked LINE ID
+- Follow-up status
+- Button: 通報者に確認メッセージを送信
+
+Private message box:
+- Title: 通報者への確認メッセージ
+- Textarea placeholder:
+  追加確認したい内容を入力してください
+- Template buttons:
+  1. 目撃場所の詳細を確認
+  2. クマの大きさ・頭数を確認
+  3. 写真や動画の追加提供を依頼
+  4. けが人・危険状況を確認
+- Send button:
+  LINEで送信
+
+Message examples:
+- 目撃場所について、可能であれば建物名・道路名・目印などを追加で教えてください。
+- クマの大きさ、頭数、移動方向について追加情報があれば教えてください。
+- 写真または動画がある場合、安全な範囲で追加提供をお願いします。
+- けが人や現在も危険が続いている状況がある場合は教えてください。
+
+API:
+GET /api/admin/reports/[id]/reporter
+- admin only
+- returns reporter safe info
+- masks LINE ID unless SUPER_ADMIN
+
+POST /api/admin/reports/[id]/private-message
+- admin/police/city office only
+- sends LINE push message to reporter
+- saves message log
+- updates followUpStatus to MESSAGE_SENT
+
+GET /api/admin/reports/[id]/private-messages
+- admin only
+- returns message history for this report
+
+Security:
+- Never expose reporter LINE ID in public API.
+- Do not include reporter LINE ID in frontend unless user role is SUPER_ADMIN.
+- Store all message logs.
+- Add rate limit:
+  max 3 follow-up messages per report per hour.
+- Add confirmation dialog before sending.
+- Prevent sending if reporterContactAllowed is false.
+- Show clear Japanese warning:
+  通報者の個人情報は安全管理の目的以外で使用しないでください。
+
+LINE-ready:
+- For now, create message logging and API structure.
+- If LINE send function is not ready, create stub:
+  sendLineMessageToReporter(lineUserId, message)
+- Tomorrow replace stub with real LINE Messaging API.

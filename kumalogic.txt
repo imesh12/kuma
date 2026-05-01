@@ -1,0 +1,742 @@
+You are a senior full-stack engineer and product architect.
+
+Build a production-ready local-first MVP for a Japan bear safety reporting system called:
+
+Kuma Safety Zone / くまセーフティゾーン
+
+MISSION:
+This system is not for killing or punishing bears.
+The goal is to protect both humans and bears by creating safe distance:
+- early reporting
+- trusted information
+- nearby LINE alerts
+- admin verification
+- public safety map
+
+Build the project as a real production foundation, not a toy demo.
+
+REFERENCE TECHNOLOGIES:
+- LINE Messaging API for webhook, reply messages, push messages, rich menu
+- PostgreSQL + PostGIS for radius search and distance calculation
+- Mapbox GL JS for map markers and popups
+- Local development first using Docker
+- Later production deployment to AWS/Sakura/Google Cloud
+
+IMPORTANT:
+LINE webhook sends HTTPS POST events to the bot server.
+LINE bot can reply/push messages to users.
+PostGIS ST_DWithin should be used for finding users within radius.
+Mapbox should show markers/popups on admin and public maps.
+
+==================================================
+PROJECT GOAL
+==================================================
+
+Create a complete local MVP with:
+
+1. LINE Bot Backend
+2. Admin Dashboard
+3. Public Web Map
+4. PostgreSQL + PostGIS database
+5. Redis queue for notifications
+6. Trust point system
+7. Nearby 1km LINE notification
+8. Admin approval workflow
+9. Audit logs
+10. Docker local setup
+
+==================================================
+TECH STACK
+==================================================
+
+Use:
+
+- Node.js
+- TypeScript
+- Next.js App Router
+- React
+- Tailwind CSS
+- shadcn/ui style components
+- Prisma ORM
+- PostgreSQL with PostGIS
+- Redis
+- BullMQ
+- Mapbox GL JS
+- LINE Messaging API
+- Zod validation
+- bcrypt for admin password hash
+- JWT or secure cookie auth for admin
+- Docker Compose
+
+Use a monorepo-style structure:
+
+kuma-safety-zone/
+  apps/
+    web/
+      app/
+      components/
+      lib/
+      styles/
+  packages/
+    database/
+    shared/
+  docker-compose.yml
+  .env.example
+  README.md
+
+If simpler, one Next.js full-stack app is also acceptable, but keep clean modules.
+
+==================================================
+CORE USER TYPES
+==================================================
+
+1. Normal LINE User
+- registers location
+- reports bear information
+- sends memo/photo/location
+- receives nearby alerts
+- can view own trust points
+
+2. Trusted Reporter
+- same as normal user
+- has higher trust score
+- admin sees their report as high priority
+
+3. City Office Admin
+- reviews reports
+- approves/rejects reports
+- sends alerts
+- views map
+- exports data
+
+4. Police / Emergency Admin
+- sees exact location
+- sees reporter data
+- sees audit history
+- can send urgent alert
+
+5. Super Admin
+- manages admins
+- system settings
+- organizations
+
+==================================================
+LINE BOT FEATURES
+==================================================
+
+Create webhook endpoint:
+
+POST /api/line/webhook
+
+Handle these events:
+- follow
+- message text
+- message location
+- message image
+- postback
+
+LINE Rich Menu concept:
+
+Buttons:
+- 🐻 通報する
+- 📍 現在地を登録
+- 🗺 近くの情報
+- 🔔 通知設定
+- 📘 安全ガイド
+- 👤 信頼ポイント
+
+MVP interaction flow:
+
+A. Register location
+User taps 現在地を登録
+Bot asks user to send LINE location
+User sends location
+System saves registered_lat / registered_lng
+Bot replies:
+「通知地点を登録しました。周辺のクマ情報を受け取れます。」
+
+B. Report bear information
+User taps 通報する
+Bot asks category:
+- クマを見た
+- 足跡を見た
+- フンを見た
+- 農作物被害
+- 道路付近
+- 学校・住宅付近
+- その他危険
+
+Then bot asks:
+1. Send location
+2. Send photo optional
+3. Send memo
+
+System saves report as:
+status = UNVERIFIED
+danger_level = LEVEL_1 or based on category
+
+Bot replies:
+「通報を受け付けました。自治体・管理者が確認します。ご協力ありがとうございます。」
+
+C. Trust points
+User asks 信頼ポイント
+Bot replies:
+- current trust score
+- trust level
+- approved report count
+- safety message
+
+==================================================
+REPORT CATEGORIES
+==================================================
+
+Use enum:
+
+BEAR_SEEN
+FOOTPRINT
+DROPPING
+CROP_DAMAGE
+ROAD_NEARBY
+SCHOOL_OR_HOUSE_NEARBY
+OTHER_DANGER
+
+Japanese labels:
+- クマを見た
+- 足跡を見た
+- フンを見た
+- 農作物被害
+- 道路付近
+- 学校・住宅付近
+- その他危険
+
+==================================================
+REPORT STATUS
+==================================================
+
+Use enum:
+
+UNVERIFIED       // 未確認
+CHECKING         // 確認中
+APPROVED         // 確認済み
+MISTAKEN         // 誤認 honest mistake
+FALSE_REPORT     // 誤報 suspicious/fake
+DANGEROUS        // 危険
+RESOLVED         // 解決済み
+
+Important:
+MISTAKEN is not punished.
+FALSE_REPORT can reduce trust score.
+
+==================================================
+DANGER LEVEL
+==================================================
+
+Use enum or integer:
+
+LEVEL_1 注意
+LEVEL_2 警戒
+LEVEL_3 危険
+LEVEL_4 緊急
+
+Suggested default:
+FOOTPRINT = LEVEL_1
+DROPPING = LEVEL_1
+BEAR_SEEN = LEVEL_2
+ROAD_NEARBY = LEVEL_3
+SCHOOL_OR_HOUSE_NEARBY = LEVEL_3
+CROP_DAMAGE = LEVEL_2
+OTHER_DANGER = LEVEL_2
+
+Admin can override.
+
+==================================================
+TRUST POINT SYSTEM
+==================================================
+
+User fields:
+- trust_score
+- trust_level
+- approved_report_count
+- rejected_report_count
+- false_report_count
+- account_status
+
+Trust levels:
+0–2: 新規ユーザー
+3–9: 一般通報者
+10–29: 信頼通報者
+30+: 地域安全サポーター
+
+Trust events:
+- approved report: +5
+- useful photo: +2
+- very important report: +10
+- duplicate but helpful: +1
+- mistaken honest report: 0
+- spam: -10
+- fake report: -20
+
+Rules:
+- No public leaderboard
+- Admin can see trust level
+- User can see own trust level in LINE
+- Trust score makes reports priority review, but does not automatically create official alert
+
+==================================================
+ADMIN DASHBOARD
+==================================================
+
+Create beautiful modern Japanese admin UI.
+
+Admin pages:
+
+1. /admin/login
+2. /admin/dashboard
+3. /admin/reports
+4. /admin/reports/[id]
+5. /admin/map
+6. /admin/users
+7. /admin/alerts
+8. /admin/audit-logs
+9. /admin/settings
+
+Dashboard cards:
+- total reports today
+- unverified reports
+- approved reports
+- dangerous reports
+- active users
+- alerts sent today
+
+Report list:
+- category
+- status
+- danger level
+- created time
+- user trust level
+- has photo
+- distance to nearest town/school optional placeholder
+- priority badge
+
+Report detail:
+- real GPS
+- public blurred GPS
+- memo
+- photo
+- reporter LINE user ID
+- reporter trust score
+- reporter approved/rejected counts
+- nearby duplicate reports
+- status update buttons
+- danger level selector
+- admin note
+- approve button
+- reject/mistaken/fake buttons
+- send alert button
+
+Admin action behavior:
+- Approve report:
+  - status APPROVED
+  - add trust points +5
+  - update approved count
+  - show send-alert modal
+
+- Mark useful photo:
+  - add +2 trust points
+
+- Mark mistaken:
+  - status MISTAKEN
+  - no penalty
+
+- Mark false:
+  - status FALSE_REPORT
+  - subtract trust points
+  - increment false count
+  - optionally limit account
+
+Alert send modal:
+- radius default 1000m
+- editable message
+- alert level
+- preview recipients count
+- confirm send
+
+==================================================
+PUBLIC MAP
+==================================================
+
+Create /map
+
+Public map shows:
+- approved reports only
+- approximate public location only
+- no reporter identity
+- marker by category
+- danger level color
+- popup:
+  - category
+  - time
+  - status
+  - memo
+  - approximate distance if user location available
+
+Do not show:
+- LINE user ID
+- exact GPS
+- admin note
+- private data
+
+Location privacy:
+When report is created, save:
+- real_lat / real_lng
+- public_lat / public_lng
+
+Public location should be blurred by rounding or random offset around 100–300m.
+
+==================================================
+NEARBY ALERT LOGIC
+==================================================
+
+When admin sends alert:
+
+1. Use PostGIS ST_DWithin to find users within radius from real report location.
+2. Calculate distance_m.
+3. Calculate direction Japanese:
+   - 北
+   - 北東
+   - 東
+   - 南東
+   - 南
+   - 南西
+   - 西
+   - 北西
+4. Create alert record.
+5. Create alert_recipient records.
+6. Queue LINE push messages using BullMQ.
+7. Worker sends LINE messages.
+8. Save delivery status.
+
+Message example:
+
+⚠️ クマ関連情報
+
+本日 16:20ごろ、
+あなたの登録地点から約800m北西付近で
+クマの足跡が報告されました。
+
+内容：
+今日畑に行った時、くまのような足跡を見ました。
+
+不要な外出を避け、
+自治体・警察の情報も確認してください。
+
+緊急時は110番へ連絡してください。
+
+Confirmed urgent example:
+
+🚨 クマ目撃情報【確認済み】
+
+本日 16:20ごろ、
+あなたの登録地点から約800m北西付近で
+クマの目撃情報が確認されました。
+
+付近を通行する際は十分注意してください。
+緊急時は110番へ連絡してください。
+
+==================================================
+DATABASE MODELS
+==================================================
+
+Use Prisma schema.
+
+Important:
+PostGIS geography/geometry may require raw SQL migrations if Prisma does not fully support geography indexes.
+
+Tables/models:
+
+User:
+- id
+- lineUserId unique
+- displayName nullable
+- registeredLat nullable
+- registeredLng nullable
+- notificationRadiusM default 1000
+- trustScore default 0
+- trustLevel
+- approvedReportCount default 0
+- rejectedReportCount default 0
+- falseReportCount default 0
+- accountStatus ACTIVE/LIMITED/BANNED
+- createdAt
+- updatedAt
+
+BearReport:
+- id
+- userId
+- type
+- memo
+- photoUrl nullable
+- realLat
+- realLng
+- publicLat
+- publicLng
+- status
+- dangerLevel
+- adminNote nullable
+- createdAt
+- updatedAt
+- approvedAt nullable
+- approvedByAdminId nullable
+
+Alert:
+- id
+- reportId
+- title
+- message
+- radiusM
+- sentByAdminId
+- sentAt
+- alertLevel
+
+AlertRecipient:
+- id
+- alertId
+- userId
+- distanceM
+- direction
+- lineDeliveryStatus
+- sentAt nullable
+- error nullable
+
+Admin:
+- id
+- name
+- email unique
+- passwordHash
+- role SUPER_ADMIN/CITY_ADMIN/POLICE_ADMIN
+- organization
+- status ACTIVE/DISABLED
+- createdAt
+- updatedAt
+
+TrustEvent:
+- id
+- userId
+- reportId nullable
+- points
+- reason
+- createdByAdminId nullable
+- createdAt
+
+AuditLog:
+- id
+- adminId nullable
+- action
+- targetType
+- targetId
+- beforeData JSON nullable
+- afterData JSON nullable
+- createdAt
+
+SystemSetting:
+- id
+- key unique
+- value JSON
+- updatedAt
+
+Photo/File table optional:
+- id
+- reportId
+- url
+- storageKey
+- mimeType
+- size
+- createdAt
+
+==================================================
+API ENDPOINTS
+==================================================
+
+Admin auth:
+POST /api/admin/auth/login
+POST /api/admin/auth/logout
+GET /api/admin/me
+
+Reports:
+GET /api/admin/reports
+GET /api/admin/reports/:id
+PATCH /api/admin/reports/:id/status
+PATCH /api/admin/reports/:id/danger-level
+POST /api/admin/reports/:id/approve
+POST /api/admin/reports/:id/mark-mistaken
+POST /api/admin/reports/:id/mark-false
+POST /api/admin/reports/:id/send-alert
+
+Map:
+GET /api/admin/map/reports
+GET /api/public/reports
+
+Users:
+GET /api/admin/users
+GET /api/admin/users/:id
+PATCH /api/admin/users/:id/status
+POST /api/admin/users/:id/trust-event
+
+Alerts:
+GET /api/admin/alerts
+GET /api/admin/alerts/:id
+POST /api/admin/alerts/preview-recipients
+POST /api/admin/alerts/send
+
+LINE:
+POST /api/line/webhook
+
+Health:
+GET /api/health
+
+Seed:
+npm run seed creates:
+- super admin account
+- sample users
+- sample reports
+- sample approved report
+
+==================================================
+LOCAL DEVELOPMENT
+==================================================
+
+docker-compose.yml should include:
+
+- postgres with postgis image
+- redis
+- optional localstack/minio for S3-like storage, or local filesystem for MVP
+
+Environment variables:
+
+DATABASE_URL=
+REDIS_URL=
+LINE_CHANNEL_ACCESS_TOKEN=
+LINE_CHANNEL_SECRET=
+MAPBOX_ACCESS_TOKEN=
+APP_URL=
+NEXT_PUBLIC_APP_URL=
+NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=
+JWT_SECRET=
+ADMIN_EMAIL=
+ADMIN_PASSWORD=
+PHOTO_STORAGE_MODE=local
+PHOTO_LOCAL_DIR=./uploads
+
+README should explain:
+
+1. npm install
+2. docker compose up -d
+3. npx prisma migrate dev
+4. npm run seed
+5. npm run dev
+6. ngrok http 3000
+7. set LINE webhook URL to:
+   https://xxxx.ngrok-free.app/api/line/webhook
+
+==================================================
+SECURITY REQUIREMENTS
+==================================================
+
+- Verify LINE webhook signature
+- Validate all input with Zod
+- Admin routes require auth
+- Role-based access control
+- Police admin can see reporter identity and exact GPS
+- City admin can see exact GPS but sensitive controls can be configurable
+- Public map never exposes private data
+- Audit log every admin action
+- Rate limit LINE reports per user
+- Prevent duplicate spam
+- Never store secrets in frontend
+- .env.example only, no real secrets
+- CSRF protection or same-site secure cookies for admin
+
+==================================================
+LOCATION / PRIVACY REQUIREMENTS
+==================================================
+
+- Store exact location for admin investigation
+- Store public blurred location for public map
+- Use public_lat/public_lng only on public API
+- Public map should not reveal exact house/farm
+- Add warning text:
+  「表示位置は安全・プライバシー保護のため、おおよその位置です。」
+
+==================================================
+UI DESIGN REQUIREMENTS
+==================================================
+
+Style:
+- Japanese government-ready but modern
+- Calm safety colors
+- Not scary/panic design
+- Mobile-friendly
+- Clear danger badges
+- Map-first workflow
+
+Use Japanese labels in UI.
+
+Admin Dashboard should feel like:
+- emergency operations dashboard
+- clean cards
+- map panel
+- review queue
+- trust score badges
+
+Public map should feel:
+- simple
+- safe
+- easy for elderly users
+- large text
+- clear warning
+
+==================================================
+IMPORTANT PRODUCT RULES
+==================================================
+
+1. This system protects bears and humans.
+2. Do not use language like “kill bear”.
+3. Use “avoid contact”, “safe distance”, “early warning”.
+4. Fake report punishment is not decided by the app.
+5. The app can flag suspicious reports and limit accounts.
+6. Police/city office decides official handling.
+7. Honest mistakes should not be punished.
+8. No public ranking of reporters.
+9. Trust points are for better admin review, not public competition.
+10. Alerts should avoid panic.
+
+==================================================
+DELIVERABLES
+==================================================
+
+Create complete project files.
+
+Include:
+- package.json scripts
+- docker-compose.yml
+- Prisma schema
+- migrations or SQL for PostGIS extension/indexes
+- seed script
+- Next.js app pages
+- API routes
+- LINE webhook service
+- notification queue worker
+- Mapbox map components
+- Admin UI
+- Public map UI
+- README with local setup
+- .env.example
+
+At the end, provide:
+1. Project structure summary
+2. Setup commands
+3. How to test LINE webhook locally
+4. Admin login credentials from seed
+5. Next development steps
+
+Start by creating the full project foundation.

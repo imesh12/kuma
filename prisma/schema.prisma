@@ -1,0 +1,247 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ReportType {
+  BEAR_SEEN
+  FOOTPRINT
+  DROPPING
+  CROP_DAMAGE
+  ROAD_NEARBY
+  SCHOOL_OR_HOUSE_NEARBY
+  OTHER_DANGER
+}
+
+enum ReportStatus {
+  UNVERIFIED
+  CHECKING
+  APPROVED
+  MISTAKEN
+  FALSE_REPORT
+  DANGEROUS
+  RESOLVED
+}
+
+enum DangerLevel {
+  LEVEL_1
+  LEVEL_2
+  LEVEL_3
+  LEVEL_4
+}
+
+enum SourceType {
+  LINE
+  PHONE
+  WEB
+  CITY
+  POLICE
+  SENSOR
+  OTHER
+}
+
+enum AccountStatus {
+  ACTIVE
+  LIMITED
+  BANNED
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  CITY_ADMIN
+  POLICE_ADMIN
+}
+
+enum AdminStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum ReporterContactStatus {
+  CONTACTABLE
+  NO_CONSENT
+  BLOCKED
+  UNKNOWN
+}
+
+enum FollowUpStatus {
+  NOT_NEEDED
+  NEEDS_CONTACT
+  MESSAGE_SENT
+  REPLIED
+  RESOLVED
+}
+
+enum PrivateMessageChannel {
+  LINE
+}
+
+enum PrivateMessageStatus {
+  DRAFT
+  SENT
+  DELIVERED
+  FAILED
+  REPLIED
+}
+
+model User {
+  id                  String   @id @default(uuid())
+  lineUserId          String   @unique
+  displayName         String?
+  registeredLat       Float?
+  registeredLng       Float?
+  notificationRadiusM Int      @default(1000)
+  trustScore          Int      @default(0)
+  trustLevel          Int      @default(0)
+  approvedReportCount Int      @default(0)
+  rejectedReportCount Int      @default(0)
+  falseReportCount    Int      @default(0)
+  maskedLineUserId    String?
+  contactConsent      Boolean  @default(false)
+  contactStatus       ReporterContactStatus @default(UNKNOWN)
+  accountStatus       AccountStatus @default(ACTIVE)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  reports               BearReport[]
+  alertRecipients       AlertRecipient[]
+  trustEvents           TrustEvent[]
+  privateMessages       PrivateMessage[]
+  followUpReports       BearReport[] @relation("ReportFollowUpReporter")
+}
+
+model BearReport {
+  id               String       @id @default(uuid())
+  userId           String
+  reporterId       String?
+  type             ReportType
+  sourceType       SourceType   @default(LINE)
+  title            String?
+  description      String?
+  memo             String?
+  prefecture       String?
+  municipality     String?
+  address          String?
+  photoUrl         String?
+  imageUrl         String?
+  realLat          Float
+  realLng          Float
+  publicLat        Float
+  publicLng        Float
+  status           ReportStatus @default(UNVERIFIED)
+  dangerLevel      DangerLevel  @default(LEVEL_1)
+  adminNote        String?
+  sightedAt        DateTime?
+  reporterContactAllowed Boolean @default(false)
+  followUpStatus   FollowUpStatus @default(NOT_NEEDED)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  approvedAt       DateTime?
+  approvedByAdminId String?
+
+  user             User         @relation(fields: [userId], references: [id])
+  reporter         User?        @relation("ReportFollowUpReporter", fields: [reporterId], references: [id])
+  alerts           Alert[]
+  trustEvents      TrustEvent[]
+  privateMessages  PrivateMessage[]
+}
+
+model Alert {
+  id            String   @id @default(uuid())
+  reportId      String
+  title         String
+  message       String
+  radiusMeters  Int      @default(1000) @map("radiusM")
+  sentByAdminId String
+  sentAt        DateTime @default(now())
+  targetCount   Int      @default(0)
+  successCount  Int      @default(0)
+  failedCount   Int      @default(0)
+  alertLevel    DangerLevel
+
+  report        BearReport @relation(fields: [reportId], references: [id])
+  recipients    AlertRecipient[]
+}
+
+model AlertRecipient {
+  id                 String   @id @default(uuid())
+  alertId            String
+  userId             String
+  distanceM          Float
+  direction          String
+  lineDeliveryStatus String
+  sentAt             DateTime?
+  error              String?
+
+  alert              Alert @relation(fields: [alertId], references: [id])
+  user               User  @relation(fields: [userId], references: [id])
+}
+
+model Admin {
+  id           String      @id @default(uuid())
+  name         String
+  email        String      @unique
+  passwordHash String
+  role         AdminRole
+  organization String?
+  status       AdminStatus @default(ACTIVE)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  privateMessages PrivateMessage[]
+}
+
+model TrustEvent {
+  id              String   @id @default(uuid())
+  userId          String
+  reportId        String?
+  points          Int
+  reason          String
+  createdByAdminId String?
+  createdAt       DateTime @default(now())
+
+  user            User        @relation(fields: [userId], references: [id])
+  report          BearReport? @relation(fields: [reportId], references: [id])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  adminId     String?
+  action      String
+  targetType  String
+  targetId    String
+  beforeData  String?
+  afterData   String?
+  createdAt   DateTime @default(now())
+}
+
+model SystemSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model PrivateMessage {
+  id            String               @id @default(uuid())
+  reportId       String
+  reporterId     String
+  senderAdminId  String
+  senderRole     AdminRole
+  channel        PrivateMessageChannel @default(LINE)
+  message        String
+  status         PrivateMessageStatus @default(DRAFT)
+  sentAt         DateTime?
+  deliveredAt    DateTime?
+  readAt         DateTime?
+  repliedAt      DateTime?
+  createdAt      DateTime             @default(now())
+
+  report         BearReport           @relation(fields: [reportId], references: [id])
+  reporter       User                 @relation(fields: [reporterId], references: [id])
+  senderAdmin    Admin                @relation(fields: [senderAdminId], references: [id])
+}
